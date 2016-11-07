@@ -46,15 +46,20 @@ class Hit implements \ArrayAccess
 			'body' => $this->source(),
 		];
 		
-		echo '<pre>';
-		print_r($params);
-		echo '</pre>';
+ 
 		$client->index($params);
 	}
 
 	function __get($name)
 	{
-		return isset($this->hit['_source'][$name]) ? $this->hit['_source'][$name] : false;
+	 
+		if(isset($this->hit['_source'][$name])){
+			return $this->hit['_source'][$name];
+		}
+		if(method_exists($this, $name)){
+			return call_user_func([$this,$name]);
+		}
+		return null;
 	}
 
 	public function __set($name, $value)

@@ -6,11 +6,12 @@ class Query {
 
 	protected $match = [];
 	protected $order = [];
-	
 	protected $term = [];
 	protected $parts = [];
-	protected $maxsize=10000;
+	protected $maxsize = 10000;
 	protected $limit;
+	protected $index;
+	protected $type;
 	protected $partStack = [];
 	protected $aggregations = [];
 
@@ -22,13 +23,9 @@ class Query {
 		$this->aggregations[] = $agg;
 		return $this;
 	}
-	
-	function limit($n){
-		$this->limit=$n;
-		return $this;
-	}
-	function orderBy($field,$order='asc'){
-		$this->order[]=['field'=>$field,'order'=>$order];
+
+	function limit($n) {
+		$this->limit = $n;
 		return $this;
 	}
 
@@ -101,6 +98,10 @@ class Query {
 		if ($part) {
 			$part->addChild(['type' => 'range', 'field' => $field, 'min' => $min, 'max' => $max]);
 		}
+		else {
+			$this->parts[] = ['type' => 'range', 'field' => $field, 'min' => $min, 'max' => $max];
+		}
+		return $this;
 	}
 
 	function getStack() {
@@ -110,11 +111,33 @@ class Query {
 		}
 	}
 
-	function get() {
+	function execute() {
 		$params = $this->buildParams();
-				
-		$results = $this->client->search($params);
-		$collection = new Result($results);
+		return $this->getClient()->search($params);
+	}
+
+	function first() {
+		$results = $this->execute();
+		if (isset($results['hits']['hits'][0])) {
+			return new Hit($results['hits']['hits'][0]);
+		}
+		return null;
+	}
+
+	function get() {
+		$results = $this->execute();
+		$collection = $this->newCollection($results);
+		return $this->prepareCollection($collection);
+	}
+
+	function newCollection($results) {
+		return new Result($results);
+	}
+
+	function prepareCollection($collection) {
+		foreach ($this->aggregations as $agg) {
+			$collection->setAggregation($agg->name(), $agg->getType());
+		}
 		return $collection;
 	}
 
@@ -122,7 +145,12 @@ class Query {
 		
 	}
 
+	function getClient() {
+		return $this->client;
+	}
+
 	function from($from) {
+
 		$ref = explode('.', $from);
 		if (isset($ref[0])) {
 			$this->index = $ref[0];
@@ -158,17 +186,18 @@ class Query {
 	function buildParams() {
 
 		$params = [
-			'index' => $this->index,
+			'index' => $this->getIndexName(),
 		];
 		if ($this->type) {
-			$params['type'] = $this->type;
+			$params['type'] = $this->getTypeName();
 		}
+
 		$params['body'] = [
 		];
-		if(count($this->parts)>0){
-			$params['body']['query']=[];
+		if (count($this->parts) > 0) {
+			$params['body']['query'] = [];
 		}
-		$params['body']['size']= $this->limit!=null ? $this->limit : $this->maxsize;		
+		$params['size'] = $this->limit !== null ? $this->limit : $this->maxsize;
 		foreach ($this->parts as $part) {
 			if ($part instanceof Query\QueryPart) {
 				$params['body']['query'][$part->key()] = $this->buildPart($part);
@@ -177,23 +206,30 @@ class Query {
 				$params['body']['query'] = $this->buildPartType($part, $params['body']['query']);
 			}
 		}
-		
-		if(count($this->aggregations)>0){
+
+		if (count($this->aggregations) > 0) {
 			$params['body']['aggs'] = [];
-			foreach($this->aggregations as $aggregation){
-				
+			foreach ($this->aggregations as $aggregation) {
+
 				$aggregation->make($params['body']['aggs']);
 			}
 		}
-		
-		if(count($this->order)>0){
-			$params['body']['sort']=[];
-			foreach($this->order as $o){
-				$params['body']['sort'] = [$o['field']=>$o['order']];
+
+		if (count($this->order) > 0) {
+			$params['body']['sort'] = [];
+			foreach ($this->order as $o) {
+				$params['body']['sort'] = [$o['field'] => $o['order']];
 			}
 		}
-		
 		return $params;
+	}
+
+	function getIndexName() {
+		return $this->index;
+	}
+
+	function getTypeName() {
+		return $this->type;
 	}
 
 	function buildPart($part) {
@@ -216,11 +252,15 @@ class Query {
 					if (!isset($query['range'])) {
 						$query['range'] = [];
 					}
+					$range = [];
+					if ($child['min']) {
+						$range['from'] = $child['min'];
+					}
+					if ($child['max']) {
+						$range['to'] = $child['max'];
+					}
 					$query['range'][
-						$child['field']] = [
-						'from' => $child['min'],
-						'to' => $child['max'],
-					];
+						$child['field']] = $range;
 
 					break;
 				case 'term':
@@ -267,6 +307,11 @@ class Query {
 			$matches[$match['field']] = $match['value'];
 		}
 		return $matches;
+	}
+
+	function orderBy($field, $order = 'asc') {
+		$this->order[] = ['field' => $field, 'order' => $order];
+		return $this;
 	}
 
 }

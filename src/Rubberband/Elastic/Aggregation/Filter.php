@@ -2,15 +2,17 @@
 
 namespace Rubberband\Elastic\Aggregation;
 
-class Terms extends \Rubberband\Elastic\Aggregation\BaseAggregation
+class Filter extends \Rubberband\Elastic\Aggregation\BaseAggregation
 {
 	protected $bucket = true;
 	public function make(&$params) {
 		$name=$this->keyname();
 		$cur = isset($params[$name])?$params[$name]:[];
-		if(!isset($cur['terms'])){
-			$cur['terms']=[
-				'field'=>$this->field,
+		if(!isset($cur['filter'])){
+			$cur['filter']=[
+				'term'=>[
+					$this->field=>$this->options['value']
+				],
 			 
 			];
 			if(count($this->aggregations)>0){

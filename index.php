@@ -14,8 +14,8 @@ error_reporting(E_ALL);
 $client = ClientBuilder::create()->build();
 
 $q=new Query($client);
-$q->from('api.people');
+$q->from('api.trans')->addAggregation(new \Rubberband\Elastic\Aggregation\DateHistogram('permonth','created_at',['interval'=>'month']));
 $rows =$q->get();
 echo '<pre>';
-print_r($rows);
+print_r($rows->aggregation('permonth')->flatten());
 echo '</pre>';

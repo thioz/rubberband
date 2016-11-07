@@ -1,12 +1,13 @@
 <?php
-namespace Rubberband\Elastic\Eloquent;
+namespace Rubberband\Elastic\Laravel\Eloquent;
+
 
 use Elasticsearch\ClientBuilder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
 
-class IndexableScope implements Scope{
+class ElasticityScope implements Scope{
 	protected $extensions = ['search'];
 	protected $aggs=[];
 	protected $maxsize=10000;

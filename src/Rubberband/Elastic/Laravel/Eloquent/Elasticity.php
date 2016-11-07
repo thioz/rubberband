@@ -1,19 +1,19 @@
 <?php
 
-namespace Rubberband\Elastic\Eloquent;
+namespace Rubberband\Elastic\Laravel\Eloquent;
 
 use DateTime;
 use Elasticsearch\ClientBuilder;
 
-trait Indexable {
+trait Elasticity {
 	public function getIndexName() {
-		return isset($this->indexname) ? $this->indexname : 'model';
+		return isset($this->indexname) ? $this->indexname : $this->getConnectionName();
 	}
 
 	public function getIndexType() {
 		return isset($this->indextype) ? $this->indextype : $this->createIndexTypeName();
 	}
-
+ 
 	function createIndexTypeName() {
 		$class = get_class($this);
 		$parts = explode('\\', strtolower($class));
@@ -77,16 +77,16 @@ trait Indexable {
 		$response = $client->index($params);
 	}
 
-	public static function bootIndexable() {
+	public static function bootElasticity() {
 		static::created(function($model) {
 
 			$model->addToIndex();
 		});
-		static::addGlobalScope(new IndexableScope);
+		static::addGlobalScope(new ElasticityScope());
 	}
 
-	function addToIndex() {
-
+	function addToIndex($id=null) {
+	 
 		$body = $this->createIndexDocument();
 		$params = [
 			'index' => $this->getIndexName(),
@@ -96,12 +96,14 @@ trait Indexable {
 			$params['id'] = $body['id'];
 			unset($body['id']);
 		}
+		if($id){
+			$params['id']=$id;
+		}
 		$params['body'] = $body;
-//			echo '<pre>';
-//			print_r($params);
-//			echo '</pre>';
+
 		$client = ClientBuilder::create()->build();
-		$response = $client->index($params);
+	 	$response = $client->index($params);
+	
 	}
 
 }

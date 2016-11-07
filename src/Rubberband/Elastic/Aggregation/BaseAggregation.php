@@ -1,8 +1,8 @@
 <?php
-namespace Rubberband\Elastic;
+namespace Rubberband\Elastic\Aggregation;
 
 
-abstract class Aggregation{
+abstract class BaseAggregation{
 	
 	protected $aggregations = [];
 	protected $options = [];
@@ -20,9 +20,32 @@ abstract class Aggregation{
 		return $this->bucket;
 	}
 	
+	function getType(){
+		return $this->bucket?'bucket':'value';
+	}
+	
 	function addAggregation($aggregation){
 		$this->aggregations[] = $aggregation;
 		return $this;
+	}
+	
+	function aggregationNames(){
+		$names=[];
+		foreach($this->aggregations as $agg){
+			$names[]=$agg->name();
+		}
+	}
+	
+	function name(){
+		return $this->name;
+	}
+
+	function keyname(){
+		return '__'.$this->name;
+	}
+
+	function field(){
+		return $this->field;
 	}
 	
 	abstract function make(&$params);
