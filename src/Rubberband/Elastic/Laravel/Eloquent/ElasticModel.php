@@ -30,28 +30,33 @@ trait ElasticModel {
 				$name = $key;
 				$key = $i;
 			}
-			$value = $this->{$key};
-			if ($value instanceof DateTime) {
-				$value = $value->format('Y-m-d');
+			if(isset($this->attributes[$key])){
+				$value = $this->attributes[$key];
+				if ($value instanceof DateTime) {
+					$value = $value->format('Y-m-d');
+				}
+				$doc[$name] = $value;
 			}
-			$doc[$name] = $value;
 		}
 		
 		$params = [
 				'index' =>$this->indexname,
 				'type' => $this->indextype,
 		];
-		if (isset($doc[$keyname])) {
-			$params['id'] = $doc[$keyname];
-			unset($doc[$keyname]);
+		
+		if($this->exists){
+			if(isset($doc[$keyname])){
+				$params['id']=$doc[$keyname];
+				unset($doc[$keyname]);
+			}
 		}
 		$params['body'] = $doc;
- 
+	 
 		$client = ClientBuilder::create()->build();
 	 	$response = $client->index($params);
-		if (!isset($doc[$keyname])) {
+		if (!$this->exists) {
 			$this->attributes[$keyname] = $response['_id'];
-			
+			$this->exists=true;
 		}
 		
 	}

@@ -13,7 +13,7 @@ trait Elasticity {
 	public function getIndexType() {
 		return isset($this->indextype) ? $this->indextype : $this->createIndexTypeName();
 	}
- 
+
 	function createIndexTypeName() {
 		$class = get_class($this);
 		$parts = explode('\\', strtolower($class));
@@ -21,18 +21,24 @@ trait Elasticity {
 	}
 
 	public function getIndexFields() {
-		return isset($this->indexable) ? $this->indexable : array_keys($this->attributes);
-		$fields=[];
-		foreach($names as $k => $name){
-			if(is_numeric($k)){
-				$key=$name;
-				$attr=$name;
+		$config = isset($this->indexable) ? $this->indexable : array_keys($this->attributes);
+		$fields = [];
+		foreach ($config as $key => $conf) {
+			if (is_numeric($key)) {
+				$field = false;
 			}
-			else{
-				$attr=$k;
-				$key=$name;
+			else {
+				$field = $key;
 			}
-			$fields[$key] = $attr;
+			if (is_string($conf)) {
+				$name = $field !== false ? $field : $conf;
+				$conf = ['multi' => false, 'field' => $conf];
+				$fields[$name] = $conf;
+			}
+			else {
+				$name = $field !== false ? $field : $conf['field'];
+				$fields[$name] = $conf;
+			}
 		}
 		return $fields;
 	}
@@ -40,16 +46,42 @@ trait Elasticity {
 	public function createIndexDocument() {
 		$fields = $this->getIndexFields();
 		$doc = [];
-		foreach ($fields as $i => $key) {
-			$name = $key;
-			if (!is_numeric($i)) {
-				$name = $key;
-				$key = $i;
-			}
-			$doc[$name] = $this->formatIndexValue($this->{$key});
+		foreach ($fields as $key => $conf) {
+			$name = isset($conf['field']) ? $conf['field'] : $key;
+			
+			$doc[$name] = $this->parseValueConfig($key, $conf);
 		}
 
 		return $doc;
+	}
+
+	function parseValueConfig($key, $conf) {
+		if (isset($conf['multi']) && $conf['multi']) {
+			$value = $this->{$key};
+			if ($value instanceof \Illuminate\Database\Eloquent\Collection) {
+				$values = [];
+				$fields = isset($conf['fields']) ? $conf['fields'] : false;
+				foreach ($value as $val) {
+					if ($fields === false || is_array($fields)) {
+						$row=[];
+						$keys= $fields===false ? array_keys($val): $fields;
+						foreach($keys as $key){
+							$row[$key] = $val->{$key};
+						}
+						$values[] = $row;
+					}
+					else {
+						if(is_string($fields)){
+							$values[] = $val->{$fields};
+						}
+					}
+				}
+				return $values;
+			}
+		}
+		else{
+			return $this->{$key};
+		}
 	}
 
 	function formatIndexValue($v) {
@@ -79,15 +111,23 @@ trait Elasticity {
 
 	public static function bootElasticity() {
 		static::created(function($model) {
+			$model->addToIndex();
+		});
+		static::saved(function($model) {
+			$model->addToIndex();
+			 
+		});
 
+		static::updated(function($model) {
 			$model->addToIndex();
 		});
 		static::addGlobalScope(new ElasticityScope());
 	}
 
-	function addToIndex($id=null) {
-	 
+	function addToIndex($id = null) {
+
 		$body = $this->createIndexDocument();
+ 
 		$params = [
 			'index' => $this->getIndexName(),
 			'type' => $this->getIndexType(),
@@ -96,14 +136,13 @@ trait Elasticity {
 			$params['id'] = $body['id'];
 			unset($body['id']);
 		}
-		if($id){
-			$params['id']=$id;
+		if ($id) {
+			$params['id'] = $id;
 		}
 		$params['body'] = $body;
 
 		$client = ClientBuilder::create()->build();
-	 	$response = $client->index($params);
-	
+		$response = $client->index($params);
 	}
 
 }

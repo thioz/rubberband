@@ -113,6 +113,7 @@ class Query {
 
 	function execute() {
 		$params = $this->buildParams();
+				
 		return $this->getClient()->search($params);
 	}
 
@@ -124,6 +125,10 @@ class Query {
 		return null;
 	}
 
+	/**
+	 * 
+	 * @return Result
+	 */
 	function get() {
 		$results = $this->execute();
 		$collection = $this->newCollection($results);
@@ -191,7 +196,7 @@ class Query {
 		if ($this->type) {
 			$params['type'] = $this->getTypeName();
 		}
-
+				
 		$params['body'] = [
 		];
 		if (count($this->parts) > 0) {

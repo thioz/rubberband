@@ -20,11 +20,11 @@ class Builder extends \Rubberband\Elastic\Query {
 		$this->connection = $connection;
 	}
 	
-	function getIndexName() {
-			
-		return $this->connection->getDatabaseName();
-	}
-	
+//	function getIndexName() {
+//			
+//		return $this->connection->getDatabaseName();
+//	}
+//	
 	function where($column, $op, $value){
 		switch($op){
 			case '=':
